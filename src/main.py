@@ -6,11 +6,21 @@ from tkinter import ttk
 from tkinter import filedialog
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-from utils.email_sender import send_email
+from utils.email_sender import send_email, save_credentials
 import threading
 
+
 class FileWatcher(FileSystemEventHandler):
-    def __init__(self, directory_to_watch, email_address, sender_email, sender_password, status_label, scan_interval, progress_bar):
+    def __init__(
+        self,
+        directory_to_watch,
+        email_address,
+        sender_email,
+        sender_password,
+        status_label,
+        scan_interval,
+        progress_bar,
+    ):
         self.directory_to_watch = directory_to_watch
         self.email_address = email_address
         self.sender_email = sender_email
@@ -21,34 +31,42 @@ class FileWatcher(FileSystemEventHandler):
         self.files_seen = set(os.listdir(directory_to_watch))
         self.running = True
 
-    # def on_created(self, event):
-    #     print(f"Event detected: {event}")  # Debugging statement
-    #     if event.is_directory:
-    #         return
-    #     if event.src_path.endswith(('.csv', '.txt')):
-    #         self.send_new_files()
+    def on_created(self, event):
+        if event.is_directory:
+            return
+        if event.src_path.endswith((".csv", ".txt")):
+            self.send_new_files()
 
     def send_new_files(self):
-        new_files = [os.path.join(self.directory_to_watch, f) for f in os.listdir(self.directory_to_watch) if f not in self.files_seen and f.endswith(('.csv', '.txt'))]
+        new_files = [
+            os.path.join(self.directory_to_watch, f)
+            for f in os.listdir(self.directory_to_watch)
+            if f not in self.files_seen and f.endswith((".csv", ".txt"))
+        ]
         if new_files:
             new_files_str = ", ".join(os.path.basename(f) for f in new_files)
-            self.status_label.config(text=f"New file(s) detected: {new_files_str}, sending email")
-            send_email(new_files, self.email_address, self.sender_email, self.sender_password)
+            self.status_label.config(
+                text=f"New file(s) detected: {new_files_str}, sending email"
+            )
+            send_email(
+                new_files, self.email_address, self.sender_email, self.sender_password
+            )
             self.files_seen.update(os.path.basename(f) for f in new_files)
             self.status_label.config(text="Idle")
 
     def start(self):
         while self.running:
-            self.progress_bar['value'] = 0
+            self.progress_bar["value"] = 0
             for i in range(self.scan_interval):
                 if not self.running:
                     break
                 time.sleep(1)
-                self.progress_bar['value'] += (100 / self.scan_interval)
+                self.progress_bar["value"] += 100 / self.scan_interval
             self.send_new_files()
 
     def stop(self):
         self.running = False
+
 
 class App:
     def __init__(self, root):
@@ -64,41 +82,65 @@ class App:
         self.scan_interval = tk.StringVar(value="1min")
         self.status = tk.StringVar(value="Idle")
 
-        ttk.Label(root, text="Directory to Watch:").grid(row=0, column=0, padx=10, pady=5)
-        
+        ttk.Label(root, text="Directory to Watch:").grid(
+            row=0, column=0, padx=10, pady=5
+        )
+
         directory_frame = ttk.Frame(root)
-        directory_frame.grid(row=0, column=1, padx=10, pady=5, columnspan=2, sticky="ew")
-        ttk.Entry(directory_frame, textvariable=self.directory_to_watch).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        ttk.Button(directory_frame, text="...", command=self.browse_directory, width=3).pack(side=tk.LEFT)
+        directory_frame.grid(
+            row=0, column=1, padx=10, pady=5, columnspan=2, sticky="ew"
+        )
+        ttk.Entry(directory_frame, textvariable=self.directory_to_watch).pack(
+            side=tk.LEFT, fill=tk.X, expand=True
+        )
+        ttk.Button(
+            directory_frame, text="...", command=self.browse_directory, width=3
+        ).pack(side=tk.LEFT)
 
         ttk.Label(root, text="Recipient Email:").grid(row=1, column=0, padx=10, pady=5)
-        ttk.Entry(root, textvariable=self.email_address).grid(row=1, column=1, padx=10, pady=5, columnspan=2, sticky="ew")
+        ttk.Entry(root, textvariable=self.email_address).grid(
+            row=1, column=1, padx=10, pady=5, columnspan=2, sticky="ew"
+        )
 
         ttk.Label(root, text="Sender Email:").grid(row=2, column=0, padx=10, pady=5)
-        ttk.Entry(root, textvariable=self.sender_email).grid(row=2, column=1, padx=10, pady=5, columnspan=2, sticky="ew")
+        ttk.Entry(root, textvariable=self.sender_email).grid(
+            row=2, column=1, padx=10, pady=5, columnspan=2, sticky="ew"
+        )
 
         ttk.Label(root, text="Sender Password:").grid(row=3, column=0, padx=10, pady=5)
-        ttk.Entry(root, textvariable=self.sender_password, show="*").grid(row=3, column=1, padx=10, pady=5, columnspan=2, sticky="ew")
+        ttk.Entry(root, textvariable=self.sender_password, show="*").grid(
+            row=3, column=1, padx=10, pady=5, columnspan=2, sticky="ew"
+        )
 
         ttk.Label(root, text="Scan Interval:").grid(row=4, column=0, padx=10, pady=5)
         scan_intervals = ["10s", "30s", "1min", "5min", "10min", "30min", "1h"]
-        ttk.Combobox(root, textvariable=self.scan_interval, values=scan_intervals).grid(row=4, column=1, padx=10, pady=5, columnspan=2, sticky="ew")
+        ttk.Combobox(root, textvariable=self.scan_interval, values=scan_intervals).grid(
+            row=4, column=1, padx=10, pady=5, columnspan=2, sticky="ew"
+        )
 
         self.start_button = ttk.Button(root, text="Start", command=self.start_watching)
         self.start_button.grid(row=5, column=0, padx=10, pady=10)
 
-        self.pause_button = ttk.Button(root, text="Pause", command=self.pause_watching, state=tk.DISABLED)
+        self.pause_button = ttk.Button(
+            root, text="Pause", command=self.pause_watching, state=tk.DISABLED
+        )
         self.pause_button.grid(row=5, column=1, padx=10, pady=10)
 
         self.status_label = ttk.Label(root, textvariable=self.status)
         self.status_label.grid(row=6, column=0, columnspan=3, padx=10, pady=10)
 
-        self.progress_bar = ttk.Progressbar(root, orient="horizontal", length=300, mode="determinate")
+        self.progress_bar = ttk.Progressbar(
+            root, orient="horizontal", length=300, mode="determinate"
+        )
         self.progress_bar.grid(row=7, column=0, columnspan=3, padx=10, pady=10)
 
         self.observer = None
         self.file_watcher = None
         self.watcher_thread = None
+
+        # Check if credentials are available, if not, show the credentials input form
+        if not self.check_credentials():
+            self.show_credentials_form()
 
     def browse_directory(self):
         directory = filedialog.askdirectory()
@@ -117,7 +159,15 @@ class App:
             return
 
         interval_seconds = self.get_interval_seconds(scan_interval)
-        self.file_watcher = FileWatcher(directory_to_watch, email_address, sender_email, sender_password, self.status_label, interval_seconds, self.progress_bar)
+        self.file_watcher = FileWatcher(
+            directory_to_watch,
+            email_address,
+            sender_email,
+            sender_password,
+            self.status_label,
+            interval_seconds,
+            self.progress_bar,
+        )
         self.observer = Observer()
         self.observer.schedule(self.file_watcher, directory_to_watch, recursive=False)
         self.observer.start()
@@ -134,7 +184,9 @@ class App:
             self.file_watcher.stop()
             self.observer.stop()
             self.observer.join()
-            self.watcher_thread.join(timeout=1)  # Use timeout to avoid blocking indefinitely
+            self.watcher_thread.join(
+                timeout=1
+            )  # Use timeout to avoid blocking indefinitely
 
         self.start_button.config(state=tk.NORMAL)
         self.pause_button.config(state=tk.DISABLED)
@@ -149,10 +201,55 @@ class App:
             return int(interval[:-1]) * 3600
         return 60  # Default to 1 minute if no match
 
+    def check_credentials(self):
+        credentials_file = os.path.join(
+            os.path.dirname(__file__), "utils", "credentials", "oauth2_credentials.json"
+        )
+        return os.path.exists(credentials_file)
+
+    def show_credentials_form(self):
+        self.credentials_window = tk.Toplevel(self.root)
+        self.credentials_window.title("Enter OAuth2 Credentials")
+        self.credentials_window.geometry("300x200")
+        self.credentials_window.resizable(False, False)
+
+        tk.Label(self.credentials_window, text="Client ID:").grid(
+            row=0, column=0, padx=10, pady=5
+        )
+        self.client_id_entry = tk.Entry(self.credentials_window)
+        self.client_id_entry.grid(row=0, column=1, padx=10, pady=5)
+
+        tk.Label(self.credentials_window, text="Tenant ID:").grid(
+            row=1, column=0, padx=10, pady=5
+        )
+        self.tenant_id_entry = tk.Entry(self.credentials_window)
+        self.tenant_id_entry.grid(row=1, column=1, padx=10, pady=5)
+
+        tk.Label(self.credentials_window, text="Client Secret:").grid(
+            row=2, column=0, padx=10, pady=5
+        )
+        self.client_secret_entry = tk.Entry(self.credentials_window, show="*")
+        self.client_secret_entry.grid(row=2, column=1, padx=10, pady=5)
+
+        tk.Button(
+            self.credentials_window, text="Save", command=self.save_credentials
+        ).grid(row=3, column=0, columnspan=2, pady=10)
+
+    def save_credentials(self):
+        credentials = {
+            "client_id": self.client_id_entry.get(),
+            "tenant_id": self.tenant_id_entry.get(),
+            "client_secret": self.client_secret_entry.get(),
+        }
+        save_credentials(credentials)
+        self.credentials_window.destroy()
+
+
 def main():
     root = tk.Tk()
     app = App(root)
     root.mainloop()
+
 
 if __name__ == "__main__":
     main()
